@@ -343,7 +343,7 @@ def setWindowLength(configFlags, index, cls):
     return
 
 def setFirstBeamAngle(highResolution, cls):
-    cls.firstBeamAngle = beamLookUp.BeamLookUp(cls.BEAM_COUNT, highResolution)[-1]
+    cls.firstBeamAngle = beamLookUp.BeamLookUp(cls.BEAM_COUNT, 0)[-1]
 
     return    
 

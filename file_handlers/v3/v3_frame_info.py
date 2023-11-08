@@ -575,7 +575,7 @@ class v3_Frame:
     def constructImage(self):
         I = self.FRAME_DATA.astype(np.uint8)
         I = cv2.flip( I, 0 )
-        allAngles = bl.BeamLookUp(self.BEAM_COUNT, self.largeLens)
+        allAngles = bl.BeamLookUp(self.BEAM_COUNT, 0)
         
         d0 = self.sampleStartDelay * 0.000001 * self.soundSpeed/2
         dm = d0 + self.samplePeriod * self.samplesPerBeam * 0.000001 * self.soundSpeed/2
