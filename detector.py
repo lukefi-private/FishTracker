@@ -348,12 +348,12 @@ class Detector(QtCore.QObject):
 
 		try:
 			with open(path, "w") as file:
-				file.write("frame;length;distance;angle;corner1 x;corner1 y;corner2 x;corner2 y;corner3 x;corner3 y;corner4 x;corner4 y\n")
+				file.write("frame;length;distance;angle;aspect;corner1 x;corner1 y;corner2 x;corner2 y;corner3 x;corner3 y;corner4 x;corner4 y\n")
 				for frame, dets in enumerate(self.detections):
 					if dets is not None:
 						for d in dets:
 							if d.corners is not None:
-								file.write(lineBase1.format(frame, d.length, d.distance, d.angle))
+								file.write(lineBase1.format(frame, d.length, d.distance, d.angle, d.aspect))
 								file.write(d.cornersToString(";"))
 								file.write("\n")
 				LogObject().print("Detections saved to path:", path)
@@ -384,15 +384,16 @@ class Detector(QtCore.QObject):
 					length = float(split_line[1])
 					distance = float(split_line[2])
 					angle = float(split_line[3])
+					aspect = float(split_line[4])
 
-					c1 = [float(split_line[5]), float(split_line[4])]
-					c2 = [float(split_line[7]), float(split_line[6])]
-					c3 = [float(split_line[9]), float(split_line[8])]
-					c4 = [float(split_line[11]), float(split_line[10])]
+					c1 = [float(split_line[6]), float(split_line[5])]
+					c2 = [float(split_line[8]), float(split_line[7])]
+					c3 = [float(split_line[10]), float(split_line[9])]
+					c4 = [float(split_line[12]), float(split_line[11])]
 					corners = np.array([c1, c2, c3, c4])
 
 					det = Detection(0)
-					det.init_from_file(corners, length, distance, angle)
+					det.init_from_file(corners, length, distance, angle, aspect)
 
 					if self.detections[frame] is None:
 						self.detections[frame] = [det]
@@ -470,9 +471,10 @@ class Detection:
 		self.length = 0
 		self.distance = 0
 		self.angle = 0
+		self.aspect = 0
 
 	def __repr__(self):
-		return "Detection \"{}\" d:{:.1f}, a:{:.1f}".format(self.label, self.distance, self.angle)
+		return "Detection \"{}\" d:{:.1f}, a:{:.1f}".format(self.label, self.distance, self.angle, self.aspect)
 
 	def init_from_data(self, data, detection_size, polar_transform):
 		"""
@@ -514,8 +516,9 @@ class Detection:
 				self.distance, self.angle = polar_transform.cart2polMetric(self.center[0], self.center[1], True)
 				self.distance = float(self.distance)
 				self.angle = float(self.angle / np.pi * 180 + 90)
+				self.aspect = float(np.arcsin(tvect[0,0]) / np.pi * 180 + 90) # aspect angle in degrees, 0 means that the length axis of the fish is perpendicular to the sound axis.  
 
-	def init_from_file(self, corners, length, distance, angle):
+	def init_from_file(self, corners, length, distance, angle, aspect):
 		"""
 		Initialize detection parameters from a csv file. Data is not stored when exporting a csv file,
 		which means it cannot be recovered here. This mainly affects the visualization of the detection.
@@ -526,6 +529,7 @@ class Detection:
 		self.length = length
 		self.distance = distance
 		self.angle = angle
+		self.aspect = aspect
 
 	def visualize(self, image, color, show_text, show_detection=True):
 		if self.corners is None:

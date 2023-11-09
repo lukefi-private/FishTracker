@@ -633,7 +633,7 @@ class FishManager(QtCore.QAbstractTableModel):
 
         try:
             with open(path, "w") as file:
-                file.write("id;frame;length;distance;angle;direction;corner1 x;corner1 y;corner2 x;corner2 y;corner3 x;corner3 y;corner4 x;corner4 y; detection\n")
+                file.write("id;frame;length;distance;angle;aspect;direction;corner1 x;corner1 y;corner2 x;corner2 y;corner3 x;corner3 y;corner4 x;corner4 y; detection\n")
 
                 lines = self.getSaveLines()
                 lines.sort(key = lambda l: (l[0].id, l[1]))
@@ -647,7 +647,7 @@ class FishManager(QtCore.QAbstractTableModel):
     def getSaveLines(self):
         """
         Iterates through all the fish and returns a list containing the fish objects, frames the fish appear in, and the following information:
-        ID, Frame, Length, Angle, Direction, Corner coordinates and wether the values are from a detection or a track.
+        ID, Frame, Length, Angle, Aspect, Direction, Corner coordinates and wether the values are from a detection or a track.
         Detection information are preferred over tracks.
         """
         lines = []
@@ -664,7 +664,7 @@ class FishManager(QtCore.QAbstractTableModel):
                 # Values calculated from detection
                 if detection is not None:
                     length = fish.length if fish.length_overwritten else detection.length
-                    line = lineBase1.format(fish.id, frame, length, detection.distance, detection.angle, fish.direction.name)
+                    line = lineBase1.format(fish.id, frame, length, detection.distance, detection.angle, detection.aspect, fish.direction.name)
                     if detection.corners is not None:
                         line += self.cornersToString(detection.corners, ";")
                     else:
@@ -681,8 +681,9 @@ class FishManager(QtCore.QAbstractTableModel):
                     center = FishEntry.trackCenter(track)
                     distance, angle = polar_transform.cart2polMetric(center[0], center[1], True)
                     angle = float(angle / np.pi * 180 + 90)
+                    aspect = np.nan # not possible to extract this from track or detection files if not stored in the files
 
-                    line = lineBase1.format(fish.id, frame, length, distance, angle, fish.direction.name)
+                    line = lineBase1.format(fish.id, frame, length, distance, angle, aspect, fish.direction.name)
                     line += self.cornersToString([[track[0], track[1]], [track[2], track[1]], [track[2], track[3]], [track[0], track[3]]], ";")
                     line += ";0"
 
@@ -708,8 +709,9 @@ class FishManager(QtCore.QAbstractTableModel):
                     id = int(split_line[0])
                     frame = int(split_line[1])
                     length = float(split_line[2])
-                    direction = SwimDirection[split_line[5]]
-                    track = [float(split_line[7]), float(split_line[6]), float(split_line[11]), float(split_line[10]), id]
+                    aspect = float(split_line[5])
+                    direction = SwimDirection[split_line[6]]
+                    track = [float(split_line[8]), float(split_line[7]), float(split_line[12]), float(split_line[11]), id]
 
                     if id in self.all_fish:
                         f = self.all_fish[id]
@@ -804,6 +806,7 @@ class FishEntry():
     def __init__(self, id, frame_in=0, frame_out=0):
         self.id = int(id)
         self.length = 0
+        self.aspect = 0
         self.direction = SwimDirection.NONE
         self.frame_in = frame_in
         self.frame_out = frame_out
@@ -823,10 +826,18 @@ class FishEntry():
         self.color_ind = 0
 
     def __repr__(self):
-        return "FishEntry {}: {:.1f} {}".format(self.id, self.length, self.direction.name)
+        return "FishEntry {}: {:.1f} {}".format(self.id, self.length, self.aspect, self.direction.name)
 
     def dirSortValue(self):
         return self.direction.value * 10**8 + self.id
+
+    def setAspect(self, value):
+        self.aspect = value
+
+    def setMeanAspect(self):
+        if not self.length_overwritten:
+            if len(self.aspects) > 0:
+                self.aspect = round(float(np.mean(self.lengths)),1)
 
     def setLength(self, value):
         self.length = value
@@ -853,6 +864,7 @@ class FishEntry():
     def copy(self):
         f = FishEntry(self.id, self.frame_in, self.frame_out)
         f.length = self.length
+        f.aspect = self.aspect
         f.direction = self.direction
         f.tracks = self.tracks.copy()
         f.lengths = self.lengths.copy()
@@ -940,6 +952,7 @@ class FishEntry():
             else:
                 self.direction = SwimDirection.UP if end_point_distance[1] > 0 else SwimDirection.DOWN
 
+            self.aspect = float(np.mean(valid_dets.aspect))
             self.mad = abs(valid_dets[-1].angle - valid_dets[0].angle)
             path_length = self.calculatePathLength(valid_dets)
             norm_dist = np.linalg.norm(end_point_distance)
@@ -961,6 +974,9 @@ class FishEntry():
 
     def setLengths(self):
         self.lengths = sorted([det.length for _, det in self.tracks.values() if det is not None])
+
+    def setAspects(self):
+        self.aspects = sorted([det.aspects for _, det in self.tracks.values() if det is not None])
 
     @staticmethod
     def trackCenter(track):

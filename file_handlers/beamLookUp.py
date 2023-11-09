@@ -94,10 +94,10 @@ def BeamLookUp(BeamCount,largeLens, beam_angle =False):
     if BeamCount == 64:
         breakpoints = breakpoints64
     if BeamCount == 48:
-        if largeLens == 1:
-            breakpoints = telephoto48
-        else:
+        if largeLens == 0:
             breakpoints = breakpoints48
+        else:
+            breakpoints = telephoto48
     if BeamCount == 135: 
         breakpoints = mp4135
     if BeamCount == 18:
